@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pointwise · 点面归属与边界版本控制台</title>
+<style>
+  :root {
+    --bg:#0f1420; --panel:#171e2e; --panel2:#1d2740; --line:#2a3756;
+    --text:#e6ebf5; --muted:#8fa0bd; --accent:#5b9dff; --ok:#3ecf8e;
+    --warn:#f5b84d; --bad:#ff6b6b; --chip:#243150;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.55 -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+         background:var(--bg); color:var(--text); }
+  header { padding:18px 24px; border-bottom:1px solid var(--line); display:flex;
+           align-items:baseline; gap:16px; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  header .meta { color:var(--muted); font-size:12px; }
+  main { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; padding:20px 24px; max-width:1400px; }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; min-width:0; }
+  section.wide { grid-column:1 / -1; }
+  h2 { font-size:14px; margin:0 0 12px; color:var(--accent); letter-spacing:.5px; text-transform:uppercase; }
+  h3 { font-size:13px; margin:14px 0 6px; color:var(--muted); }
+  button { background:var(--accent); color:#08111f; border:0; border-radius:6px; padding:7px 12px;
+           font-weight:600; cursor:pointer; }
+  button.secondary { background:var(--chip); color:var(--text); }
+  button.danger { background:var(--bad); color:#1a0606; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  textarea,input,select { width:100%; background:var(--panel2); color:var(--text);
+           border:1px solid var(--line); border-radius:6px; padding:8px; font:inherit; }
+  textarea { min-height:120px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; }
+  .chip { display:inline-block; background:var(--chip); border-radius:999px; padding:1px 9px;
+          font-size:11.5px; margin:1px 2px; }
+  .chip.ok{background:#14382b;color:var(--ok);} .chip.warn{background:#3d2f12;color:var(--warn);}
+  .chip.bad{background:#3d1717;color:var(--bad);} .chip.info{background:#17294d;color:var(--accent);}
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+  pre { background:#0b101b; border:1px solid var(--line); border-radius:8px; padding:10px;
+        overflow:auto; max-height:340px; font-size:11.5px; }
+  .muted{color:var(--muted);} .ok{color:var(--ok);} .warn{color:var(--warn);} .bad{color:var(--bad);}
+  #toast { position:fixed; right:20px; bottom:20px; max-width:420px; display:flex; flex-direction:column; gap:8px; z-index:9; }
+  .toast { padding:10px 14px; border-radius:8px; background:var(--panel2); border:1px solid var(--line); }
+  .toast.err { border-color:var(--bad); } .toast.good { border-color:var(--ok); }
+  svg { width:100%; height:280px; background:#0b101b; border:1px solid var(--line); border-radius:8px; }
+  .legend span { margin-right:12px; font-size:12px; color:var(--muted); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Pointwise 点面归属控制台</h1>
+  <span class="meta">EPSG:4326 经纬度 · 纯标准库几何引擎 · 边界/规则全版本化 · 见 docs/COORDINATES.md</span>
+  <span class="row" style="margin-left:auto;margin-top:0">
+    <button class="secondary" onclick="refresh()">刷新状态</button>
+    <label class="muted"><input type="checkbox" id="auto" style="width:auto"> 自动刷新 5s</label>
+  </span>
+</header>
+<main>
+
+<section>
+  <h2>① 系统状态</h2>
+  <div id="status" class="muted">加载中…</div>
+</section>
+
+<section>
+  <h2>② 事件接收（数据端）</h2>
+  <div class="grid2">
+    <input id="ev-id" placeholder="event_id，如 evt-1001">
+    <div class="row" style="margin:0;gap:6px">
+      <input id="ev-lon" placeholder="lon" type="number" step="any" style="width:50%">
+      <input id="ev-lat" placeholder="lat" type="number" step="any" style="width:50%">
+    </div>
+  </div>
+  <div class="row">
+    <button onclick="sendEvent()">接收事件并归属</button>
+    <button class="secondary" onclick="bulkEvents()">批量模拟 20 条</button>
+  </div>
+  <h3>最近事件</h3>
+  <div style="max-height:220px;overflow:auto"><table id="events"><thead>
+    <tr><th>seq</th><th>id</th><th>lon,lat</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<section class="wide">
+  <h2>③ 上传虚构边界（GeoJSON FeatureCollection）</h2>
+  <input type="file" id="geojson-file" accept=".json,.geojson,application/json">
+  <textarea id="geojson" placeholder='{"type":"FeatureCollection","features":[...]}'></textarea>
+  <div class="row">
+    <button onclick="uploadBoundary()">上传为 DRAFT 新版本</button>
+    <button class="secondary" onclick="loadExample()">填入示例（含重叠/边线）</button>
+  </div>
+  <div id="upload-result"></div>
+</section>
+
+<section class="wide">
+  <h2>④ 重算作业（影响范围 → 建作业 → 运行/中断 → 激活）</h2>
+  <div class="row">
+    <select id="job-version"></select>
+    <select id="job-scope"><option value="">按影响自动推荐</option>
+      <option value="FULL">FULL 全量重算</option>
+      <option value="CHANGED_REGIONS">CHANGED_REGIONS 仅变更区域</option></select>
+    <button onclick="createJob()">创建作业（固定 snapshot_seq）</button>
+  </div>
+  <div style="max-height:260px;overflow:auto;margin-top:10px"><table id="jobs"><thead>
+    <tr><th>job</th><th>版本 v旧→v新</th><th>范围</th><th>快照seq</th><th>进度</th>
+      <th>状态</th><th>影响依据</th><th>操作</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<section class="wide">
+  <h2>⑤ 冲突点（边线 / 区域重叠，需人工或规则处理）</h2>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--warn)"></i>ON_BOUNDARY 边线点</span>
+    <span><i class="dot" style="background:var(--bad)"></i>OVERLAP 重叠点</span>
+    <span><i class="dot" style="background:var(--muted)"></i>UNLOCATED 无法定位（仅在表中统计）</span>
+  </div>
+  <svg id="map" viewBox="0 0 600 280" role="img" aria-label="冲突点示意图"></svg>
+  <div style="max-height:240px;overflow:auto;margin-top:8px"><table id="conflicts"><thead>
+    <tr><th>id</th><th>事件</th><th>原因</th><th>候选区域（确定性排序）</th><th>处理</th></tr>
+    </thead><tbody></tbody></table></div>
+</section>
+
+<section>
+  <h2>⑥ 归属规则（批准后生效）</h2>
+  <div class="grid2">
+    <select id="r-boundary"><option value="MIN_ID">MIN_ID 取最小 region_id（确定）</option>
+      <option value="MANUAL">MANUAL 全部转人工冲突</option></select>
+    <select id="r-overlap"><option value="MIN_ID">MIN_ID 取最小 region_id（确定）</option>
+      <option value="MANUAL">MANUAL 全部转人工冲突</option></select>
+  </div>
+  <input id="r-note" placeholder="rationale 说明（可选）" style="margin-top:8px">
+  <div class="row"><button onclick="proposeRule()">提交规则（PENDING）</button></div>
+  <table id="rules" style="margin-top:10px"><thead><tr><th>v</th><th>边线</th><th>重叠</th>
+    <th>状态</th><th>操作</th></tr></thead><tbody></tbody></table>
+</section>
+
+<section>
+  <h2>⑦ 统计报告与新旧对比（可复现）</h2>
+  <div class="grid2">
+    <select id="rep-version"></select>
+    <select id="rep-compare"><option value="">不对比</option></select>
+  </div>
+  <div class="row"><button onclick="runReport()">生成报告</button></div>
+  <div style="max-height:240px;overflow:auto;margin-top:8px"><table id="reports"><thead>
+    <tr><th>id</th><th>边界v</th><th>对比v</th><th>事件窗口</th><th>参数哈希</th><th>操作</th></tr>
+    </thead><tbody></tbody></table></div>
+  <pre id="report-out" class="muted">报告输出…</pre>
+</section>
+
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+async function api(path, opts={}) {
+  const r = await fetch(path, {headers:{"Content-Type":"application/json"}, ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined});
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || ("HTTP "+r.status));
+  return data;
+}
+function toast(msg, kind="") {
+  const el = document.createElement("div");
+  el.className = "toast " + kind; el.textContent = msg;
+  $("toast").appendChild(el);
+  setTimeout(() => el.remove(), 5000);
+}
+const chip = (t, c="info") => `<span class="chip ${c}">${t}</span>`;
+const stateChip = s => ({COMPLETED:["ok","ok"],ACTIVE:["ok","ok"],APPROVED:["ok","ok"],
+  RUNNING:["warn","warn"],PENDING:["warn","warn"],INTERRUPTED:["warn","warn"],
+  DRAFT:["info","info"],FAILED:["bad","bad"],REJECTED:["bad","bad"],
+  SUPERSEDED:["info","info"],OPEN:["warn","warn"],RESOLVED:["ok","ok"]}[s]||["info","info"])
+  .map((c,i)=> i===0?chip(s,c):"").join("");
+
+async function refresh() {
+  const s = await api("/api/status");
+  $("status").innerHTML = `
+    <div>激活边界版本：<b>${s.active_versions.boundary_version ?? "—"}</b>
+        激活规则版本：<b>${s.active_versions.rule_version ?? "—"}</b>
+        事件总数：<b>${s.total_events}</b></div>
+    <div style="margin-top:6px">当前版本状态计数：
+      ${Object.entries(s.unlocated_counts).map(([k,v])=>chip(k+": "+v,
+        k==="UNLOCATED"?"warn":k==="ATTRIBUTED"?"ok":"info")).join("") || "<span class='muted'>无</span>"}</div>
+    <div style="margin-top:6px">边界集：${s.boundary_sets.map(b=>
+      `v${b.version} ${stateChip(b.state)} (${b.region_count} 区域${b.self_intersects?", 存在重叠":""})`).join(" ")||"<span class='muted'>无</span>"}</div>`;
+
+  $("job-version").innerHTML = s.boundary_sets.filter(b=>b.state==="DRAFT")
+    .map(b=>`<option value="${b.version}">DRAFT v${b.version}（${b.region_count} 区域）</option>`).join("")
+    || `<option value="">无 DRAFT 版本</option>`;
+  $("rep-version").innerHTML = s.boundary_sets.map(b=>
+    `<option value="${b.version}">边界 v${b.version} (${b.state})</option>`).join("");
+  $("rep-compare").innerHTML = `<option value="">不对比</option>` + s.boundary_sets.map(b=>
+    `<option value="${b.version}">对比 v${b.version}</option>`).join("");
+
+  $("jobs").querySelector("tbody").innerHTML = s.jobs.map(j=>`
+    <tr><td>${j.job_id}</td><td>v${j.boundary_version_from ?? "—"} → v${j.boundary_version_to}</td>
+      <td>${chip(j.scope, j.scope==="FULL"?"bad":"info")}</td><td>${j.snapshot_seq}</td>
+      <td>${j.processed_count}</td><td>${stateChip(j.state)}${j.conflict_count?chip(j.conflict_count+" 冲突","warn"):""}</td>
+      <td style="max-width:280px" class="muted">${(JSON.parse(j.impact_json).rationale||"")}</td>
+      <td class="row" style="margin:0">
+        <button onclick="runJob(${j.job_id})" ${["RUNNING","COMPLETED"].includes(j.state)?"disabled":""}>运行/恢复</button>
+        <button class="danger" onclick="interruptJob(${j.job_id})" ${["RUNNING","PENDING"].includes(j.state)?"":"disabled"}>中断</button>
+        <button class="secondary" onclick="activateV(${j.boundary_version_to})" ${j.state==="COMPLETED"?"":"disabled"}>激活</button>
+      </td></tr>`).join("") || `<tr><td colspan="8" class="muted">尚无作业</td></tr>`;
+
+  $("rules").querySelector("tbody").innerHTML = s.rules.map(r=>`
+    <tr><td>v${r.rule_version}</td><td>${r.on_boundary}</td><td>${r.overlap}</td>
+      <td>${stateChip(r.state)}</td>
+      <td>${r.state==="PENDING"?`<button onclick="approveRule(${r.rule_version})">批准</button>`:"—"}</td></tr>`).join("");
+
+  const conf = await api("/api/conflicts?state=OPEN");
+  $("conflicts").querySelector("tbody").innerHTML = conf.map(c=>`
+    <tr><td>${c.conflict_id}</td><td>${c.event_id}<br><span class="muted">${c.lon.toFixed(4)},${c.lat.toFixed(4)}</span></td>
+      <td class="${c.reason.includes("boundary")?"warn":"bad"}">${c.reason}</td>
+      <td>${JSON.parse(c.candidate_ids).map(id=>chip(id)).join("")}</td>
+      <td><select id="pick-${c.conflict_id}">${JSON.parse(c.candidate_ids).map(id=>
+        `<option>${id}</option>`).join("")}</select>
+        <button class="secondary" onclick="resolveC(${c.conflict_id})">确定归属</button></td></tr>`).join("")
+    || `<tr><td colspan="5" class="muted">没有待处理冲突（UNLOCATED 记录不进入冲突队列，按规则保持无归属）</td></tr>`;
+  drawMap(conf);
+
+  const evs = await api("/api/events?limit=10");
+  $("events").querySelector("tbody").innerHTML = evs.map(e=>
+    `<tr><td>${e.seq}</td><td>${e.event_id}</td><td>${e.lon.toFixed(4)},${e.lat.toFixed(4)}</td></tr>`).join("");
+
+  const reps = await api("/api/reports");
+  $("reports").querySelector("tbody").innerHTML = reps.map(r=>`
+    <tr><td>${r.report_id}</td><td>v${r.boundary_version}</td>
+      <td>${r.compare_version?("v"+r.compare_version):"—"}</td>
+      <td>${r.seq_from}–${r.seq_to}</td>
+      <td class="muted">${r.params_hash.slice(0,10)}…</td>
+      <td><button class="secondary" onclick="reproduce(${r.report_id})">复现校验</button></td></tr>`).join("")
+    || `<tr><td colspan="6" class="muted">尚无报告</td></tr>`;
+}
+
+function drawMap(conf) {
+  const svg = $("map"); svg.innerHTML = "";
+  if (!conf.length) { svg.innerHTML = `<text x="20" y="30" fill="#8fa0bd">暂无开放冲突点</text>`; return; }
+  const pts = conf.map(c=>({x:c.lon,y:c.lat,reason:c.reason}));
+  const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
+  const minX=Math.min(...xs)-1, maxX=Math.max(...xs)+1, minY=Math.min(...ys)-1, maxY=Math.max(...ys)+1;
+  const W=600,H=280,pad=24;
+  const px = x => pad+(x-minX)/(maxX-minX||1)*(W-2*pad);
+  const py = y => H-pad-(y-minY)/(maxY-minY||1)*(H-2*pad);
+  pts.forEach(p=>{
+    const c=document.createElementNS("http://www.w3.org/2000/svg","circle");
+    c.setAttribute("cx",px(p.x)); c.setAttribute("cy",py(p.y)); c.setAttribute("r",6);
+    c.setAttribute("fill", p.reason.includes("boundary") ? "#f5b84d" : "#ff6b6b");
+    c.setAttribute("opacity",.85);
+    const t=document.createElementNS("http://www.w3.org/2000/svg","title");
+    t.textContent=`${p.x.toFixed(4)},${p.y.toFixed(4)} ${p.reason}`;
+    c.appendChild(t); svg.appendChild(c);
+  });
+  const lbl=document.createElementNS("http://www.w3.org/2000/svg","text");
+  lbl.setAttribute("x",pad); lbl.setAttribute("y",16); lbl.setAttribute("fill","#8fa0bd");
+  lbl.textContent=`经度 ${minX.toFixed(2)}…${maxX.toFixed(2)} / 纬度 ${minY.toFixed(2)}…${maxY.toFixed(2)}（等比例拉伸示意，非投影地图）`;
+  svg.appendChild(lbl);
+}
+
+async function sendEvent() {
+  try {
+    await api("/api/events",{method:"POST",body:{event_id:$("ev-id").value||("evt-"+Date.now()),
+      lon:parseFloat($("ev-lon").value), lat:parseFloat($("ev-lat").value)}});
+    toast("事件已接收并按当前激活版本归属","good"); refresh();
+  } catch(e){ toast(e.message,"err"); }
+}
+async function bulkEvents() {
+  let ok=0;
+  for (let i=0;i<20;i++) {
+    const lon=116.2+Math.random()*0.7, lat=39.7+Math.random()*0.6;
+    try { await api("/api/events",{method:"POST",body:{event_id:`bulk-${Date.now()}-${i}`,lon,lat}}); ok++; }
+    catch(e){}
+  }
+  toast(`批量接收 ${ok} 条事件`,"good"); refresh();
+}
+function loadExample() { $("geojson").value = JSON.stringify(EXAMPLE, null, 2); }
+async function uploadBoundary() {
+  try {
+    const doc = JSON.parse($("geojson").value);
+    const r = await api("/api/boundaries",{method:"POST",body:doc});
+    toast(`已创建 DRAFT 边界 v${r.boundary_version}（${r.region_count} 区域，hash ${r.geometry_hash.slice(0,8)}…）`,"good");
+    $("upload-result").innerHTML = r.validation_notes.map(n=>chip(n, r.self_intersects?"warn":"ok")).join(" ");
+    refresh();
+  } catch(e){ toast("上传失败: "+e.message,"err"); }
+}
+$("geojson-file").addEventListener("change", async e=>{
+  $("geojson").value = await e.target.files[0].text();
+});
+async function createJob() {
+  const v = $("job-version").value;
+  if (!v) return toast("没有 DRAFT 边界版本","err");
+  try {
+    const r = await api(`/api/boundaries/${v}/job`,{method:"POST",
+      body:{scope:$("job-scope").value||undefined}});
+    toast(`作业 #${r.job_id} 已建，推荐范围 ${r.scope}，snapshot_seq=${r.snapshot_seq}`,"good"); refresh();
+  } catch(e){ toast(e.message,"err"); }
+}
+async function runJob(id){ try { const r=await api(`/api/jobs/${id}/run`,{method:"POST",body:{}});
+  toast(`作业 #${id} → ${r.state}（处理 ${r.processed??0}）`,"good"); refresh(); }
+  catch(e){ toast(e.message,"err"); } }
+async function interruptJob(id){ try { await api(`/api/jobs/${id}/interrupt`,{method:"POST",body:{}});
+  toast("中断请求已发出，worker 将在下一条事件边界停止","good");
+  setTimeout(refresh,1500); } catch(e){ toast(e.message,"err"); } }
+async function activateV(v){ try { const r=await api(`/api/boundaries/${v}/activate`,{method:"POST",body:{}});
+  toast(`边界 v${v} 已激活，回填 ${r.backfill.attributed} 条新事件归属`,"good"); refresh(); }
+  catch(e){ toast(e.message,"err"); } }
+async function proposeRule(){ try { const r=await api("/api/rules",{method:"POST",
+  body:{on_boundary:$("r-boundary").value,overlap:$("r-overlap").value,rationale:$("r-note").value}});
+  toast(`规则 v${r.rule_version} 已提交，待批准`,"good"); refresh(); } catch(e){ toast(e.message,"err"); } }
+async function approveRule(v){ try { await api(`/api/rules/${v}/approve`,{method:"POST",body:{}});
+  toast(`规则 v${v} 已批准并成为激活规则`,"good"); refresh(); } catch(e){ toast(e.message,"err"); } }
+async function resolveC(id){ try { await api(`/api/conflicts/${id}/resolve`,{method:"POST",
+  body:{region_id:$("pick-"+id).value}}); toast("冲突已按选定区域解决","good"); refresh(); }
+  catch(e){ toast(e.message,"err"); } }
+async function runReport(){ const v=$("rep-version").value; const cmp=$("rep-compare").value;
+  try { const r=await api("/api/reports",{method:"POST",body:{boundary_version:parseInt(v),
+    compare_version:cmp?parseInt(cmp):undefined}});
+  $("report-out").textContent=JSON.stringify(r,null,2); toast(`报告 #${r.report_id} 已固化`,"good"); refresh(); }
+  catch(e){ toast(e.message,"err"); } }
+async function reproduce(id){ try { const r=await api(`/api/reports/${id}/reproduce`,{method:"POST",body:{}});
+  toast(`报告 #${id} 复现成功，参数哈希一致`,"good");
+  $("report-out").textContent=JSON.stringify(r,null,2); } catch(e){ toast(e.message,"err"); } }
+
+const EXAMPLE = {type:"FeatureCollection", features:[
+  {type:"Feature", properties:{region_id:"R-NORTH", name:"北区"},
+    geometry:{type:"Polygon", coordinates:[[[116.2,39.9],[116.9,39.9],[116.9,40.3],[116.2,40.3],[116.2,39.9]]]}},
+  {type:"Feature", properties:{region_id:"R-SOUTH", name:"南区"},
+    geometry:{type:"Polygon", coordinates:[[[116.2,39.7],[116.9,39.7],[116.9,39.95],[116.2,39.95],[116.2,39.7]]]}},
+  {type:"Feature", properties:{region_id:"R-EAST", name:"东区（与北区重叠）"},
+    geometry:{type:"Polygon", coordinates:[[[116.7,39.85],[117.0,39.85],[117.0,40.2],[116.7,40.2],[116.7,39.85]]]}}
+]};
+
+refresh();
+setInterval(()=>{ if($("auto").checked) refresh(); }, 5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+{
+  "type": "FeatureCollection",
+  "name": "fictional-boundary-v1",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {"region_id": "NORTH", "name": "虚构北区"},
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [116.20, 39.90], [116.90, 39.90], [116.90, 40.30],
+          [116.20, 40.30], [116.20, 39.90]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {"region_id": "SOUTH", "name": "虚构南区（与北区共享 y=39.90 边线）"},
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [116.20, 39.60], [116.90, 39.60], [116.90, 39.90],
+          [116.20, 39.90], [116.20, 39.60]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {"region_id": "OVERLAP-ZONE", "name": "虚构重叠区（与北区相交，上传时会被审计）"},
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [116.70, 40.10], [117.00, 40.10], [117.00, 40.30],
+          [116.70, 40.30], [116.70, 40.10]
+        ]]
+      }
+    }
+  ]
+}

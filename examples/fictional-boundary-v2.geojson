@@ -1,0 +1,50 @@
+{
+  "type": "FeatureCollection",
+  "name": "fictional-boundary-v2",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {"region_id": "NORTH", "name": "虚构北区（南界南移至 39.85）"},
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [116.20, 39.85], [116.90, 39.85], [116.90, 40.30],
+          [116.20, 40.30], [116.20, 39.85]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {"region_id": "SOUTH", "name": "虚构南区（北界同步南移）"},
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [116.20, 39.60], [116.90, 39.60], [116.90, 39.85],
+          [116.20, 39.85], [116.20, 39.60]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {"region_id": "OVERLAP-ZONE", "name": "虚构重叠区（几何不变）"},
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [116.70, 40.10], [117.00, 40.10], [117.00, 40.30],
+          [116.70, 40.30], [116.70, 40.10]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {"region_id": "NEW-EAST", "name": "虚构新增东区"},
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [117.00, 39.60], [117.40, 39.60], [117.40, 40.30],
+          [117.00, 40.30], [117.00, 39.60]
+        ]]
+      }
+    }
+  ]
+}

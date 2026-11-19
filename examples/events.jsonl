@@ -1,0 +1,6 @@
+{"event_id": "ex-001", "lon": 116.50, "lat": 40.10, "payload": {"note": "inside NORTH"}}
+{"event_id": "ex-002", "lon": 116.50, "lat": 39.90, "payload": {"note": "on the NORTH/SOUTH shared edge -> ON_BOUNDARY"}}
+{"event_id": "ex-003", "lon": 116.85, "lat": 40.20, "payload": {"note": "inside NORTH + OVERLAP-ZONE -> OVERLAP"}}
+{"event_id": "ex-004", "lon": 116.50, "lat": 39.70, "payload": {"note": "inside SOUTH"}}
+{"event_id": "ex-006", "lon": 116.50, "lat": 39.87, "payload": {"note": "v1: inside SOUTH; v2 boundary moves to 39.85 -> inside NORTH, ownership changes"}}
+{"event_id": "ex-005", "lon": 120.00, "lat": 50.00, "payload": {"note": "outside every region -> UNLOCATED, never assigned"}}
